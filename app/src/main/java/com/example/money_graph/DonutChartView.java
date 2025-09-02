@@ -3,8 +3,10 @@ package com.example.money_graph;
 import android.content.Context;
 import android.graphics.*;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -12,24 +14,16 @@ public class DonutChartView extends View {
 
     private List<SegmentData> segmentDataList = new ArrayList<>();
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private Random random = new Random();
-
-    // Настройки по умолчанию
-    private float donutWidth = 40f;
-    private int[] defaultColors = {
-            Color.RED, Color.BLUE, Color.GREEN, Color.YELLOW,
-            Color.MAGENTA, Color.CYAN, Color.GRAY, Color.rgb(255, 165, 0)
-    };
+    private float donutWidth;
+    private float donutPieSkip;
 
     public static class SegmentData {
         public double value;    // Значение сегмента
         public int color;       // Цвет сегмента
-        public float width;     // Ширина сегмента
 
         public SegmentData(double value, int color, float width) {
             this.value = value;
             this.color = color;
-            this.width = width;
         }
 
         public SegmentData(double value, int color) {
@@ -60,12 +54,12 @@ public class DonutChartView extends View {
         paint.setStyle(Paint.Style.FILL);
     }
 
-    // Основной метод для установки данных
     public void setData(List<Double> values) {
         segmentDataList.clear();
         for (int i = 0; i < values.size(); i++) {
-            int color = defaultColors[i % defaultColors.length];
-            segmentDataList.add(new SegmentData(values.get(i), color, donutWidth));
+            float[] hsv = {360f * (float)i / values.size(), 1f, 1f};
+            int color = Color.HSVToColor(hsv);
+            segmentDataList.add(new SegmentData(values.get(i), color));
         }
         invalidate();
     }
@@ -73,43 +67,23 @@ public class DonutChartView extends View {
     // Метод с кастомными цветами
     public void setData(List<Double> values, List<Integer> colors) {
         segmentDataList.clear();
-        for (int i = 0; i < values.size(); i++) {
-            int color = i < colors.size() ? colors.get(i) : defaultColors[i % defaultColors.length];
-            segmentDataList.add(new SegmentData(values.get(i), color, donutWidth));
+        if (values.size() == colors.size()) {
+            for (int i = 0; i < values.size(); i++) {
+                segmentDataList.add(new SegmentData(values.get(i), colors.get(i)));
+            }
+        } else {
+            setData(values);
         }
         invalidate();
     }
 
-    // Метод с кастомными цветами и ширинами
-    public void setData(List<Double> values, List<Integer> colors, List<Float> widths) {
-        segmentDataList.clear();
-        for (int i = 0; i < values.size(); i++) {
-            int color = i < colors.size() ? colors.get(i) : defaultColors[i % defaultColors.length];
-            float width = i < widths.size() ? widths.get(i) : donutWidth;
-            segmentDataList.add(new SegmentData(values.get(i), color, width));
-        }
-        invalidate();
-    }
-
-    // Метод для ручной установки SegmentData
-    public void setSegmentData(List<SegmentData> data) {
-        segmentDataList = new ArrayList<>(data);
-        invalidate();
-    }
-
-    // Установка ширины donut
     public void setDonutWidth(float width) {
         this.donutWidth = width;
         invalidate();
     }
-
-    // Генерация случайного цвета
-    private int generateRandomColor() {
-        return Color.rgb(
-                random.nextInt(256),
-                random.nextInt(256),
-                random.nextInt(256)
-        );
+    public void setDonutPieSkip(float pieSkip) {
+        this.donutPieSkip = pieSkip;
+        invalidate();
     }
 
     @Override
@@ -121,7 +95,9 @@ public class DonutChartView extends View {
         float centerX = getWidth() / 2f;
         float centerY = getHeight() / 2f;
         float minDimension = Math.min(getWidth(), getHeight());
-        float min_percentage = (float)((donutWidth / (minDimension - donutWidth)) / (Math.PI * 2));
+        float min_percentage = (float)((donutWidth / (minDimension - donutWidth)) / (Math.PI * 2)) + 10f / 360f;
+
+        Log.d("DRAW_SEGMENT", "Min percenrage: " + min_percentage);
 
         // Вычисляем общую сумму значений
         double total = 0;
@@ -129,41 +105,73 @@ public class DonutChartView extends View {
             total += data.value;
         }
 
-        double [] segments_percentage = new double[segmentDataList.size()];
+        // Добавляем долю от "мёртвой зоны"
+//        total *= 360f / (360f - 10f);
 
+        // Расчитываем доли
+        double [] segments_percentage = new double[segmentDataList.size()];
+        int count_final_segments = 0;
+        double other_segments_percentage = 0;
+        int index_of_min_segments_with_valid_percentage = 0;
+        for (int i = 0; i < segmentDataList.size(); i++) {
+            segments_percentage[i] = segmentDataList.get(i).value / total;
+            Log.d("DRAW_SEGMENT", "Pergentage (" + i + "): " + segments_percentage[i]);
+            if (segments_percentage[i] > min_percentage) {
+                count_final_segments++;
+                index_of_min_segments_with_valid_percentage = (segments_percentage[i] < segments_percentage[index_of_min_segments_with_valid_percentage]) ? i : index_of_min_segments_with_valid_percentage;
+            } else {
+                other_segments_percentage += segments_percentage[i];
+                segments_percentage[i] = -1;
+            }
+        }
+
+        if (other_segments_percentage < min_percentage) {
+            double delta_percentage = (min_percentage - other_segments_percentage) / count_final_segments;
+            if (segments_percentage[index_of_min_segments_with_valid_percentage] - delta_percentage < min_percentage) {
+                other_segments_percentage += segments_percentage[index_of_min_segments_with_valid_percentage];
+                segments_percentage[index_of_min_segments_with_valid_percentage] = -1;
+            } else {
+                for (double seg : segments_percentage) {
+                    seg -= delta_percentage;
+                }
+            }
+        }
 
         // Рисуем сегменты
-        float startAngle = 0f;
+        float startAngle = -90f + donutPieSkip / 2f;
         for (int i = 0; i < segmentDataList.size(); i++) {
-            SegmentData data = segmentDataList.get(i);
+            if (segments_percentage[i] > 0) {
+                float sweepAngle = (float) ((360f - donutPieSkip) * segments_percentage[i]) - donutPieSkip;
 
-            // Рассчитываем угол для этого сегмента
-            float sweepAngle = (float) (360f * (data.value / total)) - 5;
+                // Рисуем сегмент
+                drawSegment(canvas, centerX, centerY, minDimension,
+                        startAngle, sweepAngle, segmentDataList.get(i).color);
 
-            // Рисуем сегмент
-            drawSegment(canvas, centerX, centerY, minDimension,
-                    startAngle, sweepAngle, data.color, data.width, data.width / 2f);
-
-            startAngle += sweepAngle + 5;
+                startAngle += sweepAngle + donutPieSkip;
+            }
         }
+        drawSegment(canvas, centerX, centerY, minDimension,
+                startAngle, (float) ((360f - donutPieSkip) * other_segments_percentage), Color.GRAY);
     }
 
     private void drawSegment(Canvas canvas, float centerX, float centerY, float size,
-                             float startAngle, float sweepAngle, int color, float width, float curvness) {
+                             float startAngle, float sweepAngle, int color) {
+
+        Log.d("DRAW_SEGMENT", "Start angle: " + startAngle + ", sweep angle: " + sweepAngle);
 
         // ============================================================ //
 
         // Вычисляем радиусы
         float outerRadius = size / 2f;
-        float innerRadius = outerRadius - width;
+        float innerRadius = outerRadius - donutWidth;
 
         // Преобразуем углы старта и размаха в радианы
         double startRad = Math.toRadians(startAngle);
         double endRad = Math.toRadians(startAngle + sweepAngle);
 
         // Определяем отклонения для дуг
-        double outerDeltaRad = curvness / outerRadius;
-        double innerDeltaRad = curvness / innerRadius;
+        double outerDeltaRad = donutWidth / outerRadius / 2f;
+        double innerDeltaRad = donutWidth / innerRadius / 2f;
 
         // Преобразуем радианы дельт в углы
         double outerDeltaAngle = Math.toDegrees(outerDeltaRad);
@@ -182,15 +190,15 @@ public class DonutChartView extends View {
         float dotRefLeftDownX = centerX + innerRadius * (float)Math.cos(startRad);
         float dotRefLeftDownY = centerY + innerRadius * (float)Math.sin(startRad);
 
-        float stickRightUpX = centerX + (outerRadius - curvness) * (float)Math.cos(endRad);
-        float stickRightUpY = centerY + (outerRadius - curvness) * (float)Math.sin(endRad);
-        float stickRightDownX = centerX + (innerRadius + curvness) * (float)Math.cos(endRad);
-        float stickRightDownY = centerY + (innerRadius + curvness) * (float)Math.sin(endRad);
+        float stickRightUpX = centerX + (outerRadius - donutWidth / 2f) * (float)Math.cos(endRad);
+        float stickRightUpY = centerY + (outerRadius - donutWidth / 2f) * (float)Math.sin(endRad);
+        float stickRightDownX = centerX + (innerRadius + donutWidth / 2f) * (float)Math.cos(endRad);
+        float stickRightDownY = centerY + (innerRadius + donutWidth / 2f) * (float)Math.sin(endRad);
 
-        float stickLeftUpX = centerX + (outerRadius - curvness) * (float)Math.cos(startRad);
-        float stickLeftUpY = centerY + (outerRadius - curvness) * (float)Math.sin(startRad);
-        float stickLeftDownX = centerX + (innerRadius + curvness) * (float)Math.cos(startRad);
-        float stickLeftDownY = centerY + (innerRadius + curvness) * (float)Math.sin(startRad);
+        float stickLeftUpX = centerX + (outerRadius - donutWidth / 2f) * (float)Math.cos(startRad);
+        float stickLeftUpY = centerY + (outerRadius - donutWidth / 2f) * (float)Math.sin(startRad);
+        float stickLeftDownX = centerX + (innerRadius + donutWidth / 2f) * (float)Math.cos(startRad);
+        float stickLeftDownY = centerY + (innerRadius + donutWidth / 2f) * (float)Math.sin(startRad);
 
         // ============================================================ //
 

@@ -223,7 +223,8 @@ public class MainActivity extends AppCompatActivity {
 
                 // Обновляем график
                 DonutChartView donutChart = findViewById(R.id.donutChart);
-                donutChart.setDonutWidth(10f);
+                donutChart.setDonutWidth(50f);
+                donutChart.setDonutPieSkip(4f);
                 donutChart.setData(values);
 
                 // Скрываем загрузку
@@ -331,30 +332,6 @@ public class MainActivity extends AppCompatActivity {
         int totalCount_first = all_Transaction.size();
         int totalCount_second = balanceChanges.size();
 
-        for(int i = 0; i < balanceChanges.size(); i++) {
-            Balance_transaction temp_transaction_second = balanceChanges.get(i);
-
-            if (temp_transaction_second.getIndex() == -1) {
-//                Log.d("SECOND_LIST", formatDate(temp_transaction_second.getDate()) + " " +
-//                        temp_transaction_second.getIndex() + " " +
-//                        temp_transaction_second.getType() + " " +
-//                        temp_transaction_second.getAmount() + " " +
-//                        temp_transaction_second.getCurrency());
-            } else {
-                Simple_transaction temp_transaction_first = all_Transaction.get(temp_transaction_second.getIndex());
-//                Log.d("SECOND_LIST", formatDate(temp_transaction_second.getDate()) + " " +
-//                        temp_transaction_second.getIndex() + " " +
-//                        temp_transaction_second.getType() + " " +
-//                        temp_transaction_second.getAmount() + " " +
-//                        temp_transaction_second.getCurrency() + " - " +
-//                        temp_transaction_first.getType() + " " +
-//                        temp_transaction_first.getBank_account_from() + " " +
-//                        temp_transaction_first.getTransfer_to() + " " +
-//                        temp_transaction_first.getTransfer_amount() + " " +
-//                        temp_transaction_first.getTransfer_note());
-            }
-        }
-
         double totalSum = roundDecimal(calculateTotalSum(balanceChanges));
         double [] list_totalSum = new double[7];
         list_totalSum = calculateTotalSums(balanceChanges);
@@ -375,7 +352,7 @@ public class MainActivity extends AppCompatActivity {
 
         DonutChartView donutChart = findViewById(R.id.donutChart);
 
-        donutChart.setDonutWidth(10f);     // Толщина кольца
+        donutChart.setDonutWidth(30f);     // Толщина кольца
         List<Double> values = Arrays.asList(list_totalSum[0], list_totalSum[1], list_totalSum[2], list_totalSum[3], list_totalSum[4]);
         donutChart.setData(values);
 
